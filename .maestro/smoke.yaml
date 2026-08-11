@@ -1,0 +1,13 @@
+appId: com.bookchaowalit.clipboardmanager
+name: Clipboard Manager primary navigation smoke
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Clipboard Manager"
+- assertVisible: "Getting Started"
+- tapOn: "Explore"
+- assertVisible: "Discover features and content for Clipboard Manager."
+- tapOn: "Profile"
+- assertVisible: "Chaowalit Greepoke"
+- tapOn: "Home"
+- assertVisible: "Getting Started"

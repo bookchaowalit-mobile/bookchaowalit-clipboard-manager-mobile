@@ -30,7 +30,7 @@ export default function HomeScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Part of Chaowalit Greepoke's 101 Portfolio Projects
+          {"Part of Chaowalit Greepoke's 101 Portfolio Projects"}
         </Text>
         <Link href="https://bookchaowalit.com" asChild>
           <Pressable>
