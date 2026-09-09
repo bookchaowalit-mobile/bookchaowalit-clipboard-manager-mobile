@@ -1,13 +1,25 @@
 appId: com.bookchaowalit.clipboardmanager
-name: Clipboard Manager primary navigation smoke
+name: Clipboard Manager primary workflow smoke
 ---
 - launchApp:
     clearState: true
-- assertVisible: "Clipboard Manager"
-- assertVisible: "Getting Started"
+- assertVisible: "CLIP / BOARD"
+- assertVisible: "Keep the useful line."
+- tapOn: "New snippet"
+- inputText: "Maestro smoke snippet"
+- tapOn: "File snippet"
+- assertVisible: "Maestro smoke snippet"
+- hideKeyboard
+- tapOn: "Pin"
+- assertVisible: "PINNED"
+- tapOn: "Copy"
+- assertVisible: "COPIED / READY TO DELIVER"
+- tapOn: "Delete"
+- assertVisible: "No saved snippets yet. File your first useful line above."
 - tapOn: "Explore"
-- assertVisible: "Discover features and content for Clipboard Manager."
+- assertVisible: "File snippets"
+- assertVisible: "Private by default"
 - tapOn: "Profile"
 - assertVisible: "Chaowalit Greepoke"
 - tapOn: "Home"
-- assertVisible: "Getting Started"
+- assertVisible: "CLIP / BOARD"

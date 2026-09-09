@@ -32,6 +32,11 @@ Run `npm run release:check` for the fail-closed validation plus production
 dependency audit. See [TEST-EVIDENCE.md](./TEST-EVIDENCE.md) for the latest
 local emulator result and unresolved release blockers.
 
+The Android and iOS store paths, credentials boundary, and submission
+commands are in [RELEASE.md](./RELEASE.md).
+The current privacy-policy draft and store-copy draft are in
+[PRIVACY.md](./PRIVACY.md) and [STORE-LISTING.md](./STORE-LISTING.md).
+
 ## Build
 
 ```bash
