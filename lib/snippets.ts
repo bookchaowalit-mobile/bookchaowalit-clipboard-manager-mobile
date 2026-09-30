@@ -41,6 +41,45 @@ export function parseStoredSnippets(value: string | null): Snippet[] {
   }
 }
 
+export type StoredRead = { items: Snippet[]; intact: boolean };
+
+/**
+ * Like `parseStoredSnippets`, but also reports whether the stored archive was
+ * read completely. When it was not (corrupt JSON, foreign shape, dropped or
+ * evicted entries), the screen must not write back, or the next save would
+ * replace the user's archive with the partial/empty result.
+ */
+export function readStoredSnippets(value: string | null): StoredRead {
+  if (!value) {
+    return { items: [], intact: true };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { items: [], intact: false };
+  }
+  if (!Array.isArray(parsed)) {
+    return { items: [], intact: false };
+  }
+  const valid = parsed.filter(isSnippet);
+  const items = enforceLimit(valid);
+  return { items, intact: valid.length === parsed.length && items.length === valid.length };
+}
+
+/**
+ * Duplicate-detection key: the same text copied on Windows (CRLF), classic
+ * Mac (CR) or from a web page (U+2028) — or with invisible zero-width/BOM
+ * characters — is the same snippet.
+ */
+export function snippetKey(text: string): string {
+  return text
+    .replace(/\r\n?|[\u2028\u2029]/g, "\n")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .normalize("NFC")
+    .trim();
+}
+
 export function createSnippetId(now = Date.now(), random = Math.random) {
   return now.toString(36) + "-" + random().toString(36).slice(2, 8);
 }
@@ -77,11 +116,16 @@ export function addSnippet(
   now = Date.now(),
   id = createSnippetId(now),
 ): AddResult {
-  const text = rawText.trim().slice(0, MAX_SNIPPET_LENGTH);
-  if (!text) {
+  let text = rawText.trim().slice(0, MAX_SNIPPET_LENGTH);
+  // Never keep half of an emoji at the length cap.
+  if (/[\uD800-\uDBFF]$/.test(text)) {
+    text = text.slice(0, -1);
+  }
+  const key = snippetKey(text);
+  if (!key) {
     return { items, added: false };
   }
-  const existing = items.find((item) => item.text === text);
+  const existing = items.find((item) => snippetKey(item.text) === key);
   const snippet: Snippet = existing
     ? { ...existing, createdAt: now }
     : { id, text, createdAt: now, pinned: false };

@@ -51,3 +51,13 @@ Score: 8/10 (unchanged scale; one data-loss bug fixed) — archive export and st
 - Screen tests (jest-expo): duplicate filing moves the snippet up without a copy; failed read never writes; export payload shape. 17 tests total.
 - Advisories: unchanged — only `image-size` (high, metro), `uuid`, `decode-uri-component` remain and have no same-major fix.
 - Verified: typecheck, lint, jest (17), Android `expo export` bundle.
+
+## Done in this pass (pass 3)
+
+Score: 8/10 (was 7.5/10) — edge-case hunt in `lib/snippets.ts`.
+
+- Bug (data loss): pass 2 guarded against a *rejected* storage read, but corrupt JSON or entries this version cannot read still parsed to `[]`/a partial list and the save effect then overwrote the stored archive. New `readStoredSnippets` reports `intact`; the screen only enables saving for an intact archive and shows "ARCHIVE DAMAGED / NOT OVERWRITTEN" otherwise.
+- Bug: the same text copied with CRLF, a lone CR, U+2028 or a leading zero-width space/BOM was filed as a new snippet; duplicates now compare `snippetKey` (normalised line endings, invisible chars stripped, NFC). Zero-width-only input is rejected as blank.
+- Bug: the 5,000-unit cap could store half an emoji.
+- a11y: stats label says "1 file" instead of "1 files".
+- Verified: typecheck, lint, 20 Jest tests, Android `expo export`.

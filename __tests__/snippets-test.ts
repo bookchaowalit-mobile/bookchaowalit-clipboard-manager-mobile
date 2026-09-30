@@ -4,6 +4,8 @@ import {
   enforceLimit,
   filterSnippets,
   parseStoredSnippets,
+  readStoredSnippets,
+  snippetKey,
   type Snippet,
 } from "../lib/snippets";
 
@@ -90,5 +92,33 @@ describe("parseStoredSnippets", () => {
       snip("nan", { createdAt: Number.NaN }),
     ]);
     expect(parseStoredSnippets(stored)).toEqual([good]);
+  });
+});
+
+describe("pass 3 edge cases", () => {
+  test("flags corrupt or partly unreadable archives so they are not overwritten", () => {
+    expect(readStoredSnippets(null)).toEqual({ items: [], intact: true });
+    expect(readStoredSnippets("{oops").intact).toBe(false);
+    expect(readStoredSnippets('{"a":1}').intact).toBe(false);
+    const good = snip("g");
+    expect(readStoredSnippets(JSON.stringify([good]))).toEqual({ items: [good], intact: true });
+    expect(readStoredSnippets(JSON.stringify([good, { id: 1 }])).intact).toBe(false);
+  });
+
+  test("treats CRLF, lone CR, U+2028 and zero-width variants as the same snippet", () => {
+    const start = addSnippet([], "line one\nline two", 1, "a").items;
+    for (const variant of ["line one\r\nline two", "line one\rline two", "line one\u2028line two", "\u200Bline one\nline two"]) {
+      const result = addSnippet(start, variant, 2, "b");
+      expect(result.added).toBe(false);
+      expect(result.items).toHaveLength(1);
+    }
+    expect(snippetKey("\uFEFF\u200B")).toBe("");
+    expect(addSnippet([], "\u200B\u200B").added).toBe(false);
+  });
+
+  test("never stores half an emoji at the length cap", () => {
+    const text = "x".repeat(MAX_SNIPPET_LENGTH - 1) + "📋";
+    const [item] = addSnippet([], text, 1, "e").items;
+    expect(item.text).toBe("x".repeat(MAX_SNIPPET_LENGTH - 1));
   });
 });

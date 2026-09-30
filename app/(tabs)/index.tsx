@@ -18,7 +18,7 @@ import {
   addSnippet,
   exportArchive,
   filterSnippets,
-  parseStoredSnippets,
+  readStoredSnippets,
   type Snippet,
 } from "../../lib/snippets";
 
@@ -80,8 +80,14 @@ export default function HomeScreen() {
         if (!active) {
           return;
         }
-        setItems(parseStoredSnippets(stored));
-        setCanSave(true);
+        const read = readStoredSnippets(stored);
+        setItems(read.items);
+        if (read.intact) {
+          setCanSave(true);
+        } else {
+          // Keep the damaged archive on disk untouched; export still works.
+          setStatus("ARCHIVE DAMAGED / NOT OVERWRITTEN");
+        }
         setIsHydrated(true);
       })
       .catch(() => {
@@ -199,7 +205,7 @@ export default function HomeScreen() {
           {status}
         </Text>
         <View
-          accessibilityLabel={items.length + " files, " + pinnedCount + " pinned"}
+          accessibilityLabel={`${items.length} ${items.length === 1 ? "file" : "files"}, ${pinnedCount} pinned`}
           style={styles.stats}
         >
           <Text style={styles.statValue}>{String(items.length).padStart(2, "0")}</Text>
