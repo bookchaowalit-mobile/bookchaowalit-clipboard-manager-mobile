@@ -11,54 +11,14 @@ import {
   View,
 } from "react-native";
 
-type Snippet = {
-  id: string;
-  text: string;
-  createdAt: number;
-  pinned: boolean;
-};
-
-const STORAGE_KEY = "clipboard-manager.snippets.v1";
-const MAX_SNIPPET_LENGTH = 5_000;
-
-function isSnippet(value: unknown): value is Snippet {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Partial<Snippet>;
-  return (
-    typeof candidate.id === "string" &&
-    typeof candidate.text === "string" &&
-    candidate.text.length <= MAX_SNIPPET_LENGTH &&
-    typeof candidate.createdAt === "number" &&
-    Number.isFinite(candidate.createdAt) &&
-    typeof candidate.pinned === "boolean"
-  );
-}
-
-function parseStoredSnippets(value: string | null): Snippet[] {
-  if (!value) {
-    return [];
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed)
-      ? parsed.filter(isSnippet).slice(0, 100)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function createSnippetId() {
-  return (
-    Date.now().toString(36) +
-    "-" +
-    Math.random().toString(36).slice(2, 8)
-  );
-}
+import {
+  MAX_SNIPPET_LENGTH,
+  STORAGE_KEY,
+  addSnippet,
+  filterSnippets,
+  parseStoredSnippets,
+  type Snippet,
+} from "../../lib/snippets";
 
 function ActionButton({
   label,
@@ -149,35 +109,25 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    return [...items]
-      .filter((item) => item.text.toLocaleLowerCase().includes(normalizedQuery))
-      .sort(
-        (left, right) =>
-          Number(right.pinned) - Number(left.pinned) ||
-          right.createdAt - left.createdAt,
-      );
-  }, [items, query]);
+  const filteredItems = useMemo(
+    () => filterSnippets(items, query),
+    [items, query],
+  );
 
   const pinnedCount = items.filter((item) => item.pinned).length;
 
   const saveSnippet = () => {
-    const text = draft.trim();
-    if (!text) {
+    const result = addSnippet(items, draft);
+    if (result.items === items) {
       setStatus("HOLD / WRITE A SNIPPET FIRST");
       return;
     }
 
-    const snippet: Snippet = {
-      id: createSnippetId(),
-      text,
-      createdAt: Date.now(),
-      pinned: false,
-    };
-    setItems((current) => [snippet, ...current].slice(0, 100));
+    setItems(result.items);
     setDraft("");
-    setStatus("FILED / SNIPPET IN ARCHIVE");
+    setStatus(
+      result.added ? "FILED / SNIPPET IN ARCHIVE" : "MOVED UP / ALREADY FILED",
+    );
   };
 
   const readClipboard = async () => {

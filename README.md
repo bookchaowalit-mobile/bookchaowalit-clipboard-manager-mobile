@@ -24,9 +24,11 @@ npx expo start
 npm run validate
 ```
 
-The validation command runs lint, TypeScript checks, and Jest tests. CI also
+The validation command runs lint, TypeScript checks, and Jest tests (screen
+tests plus unit tests for the pure archive logic in `lib/snippets.ts`). CI also
 exports the Android JavaScript bundle. It fails on errors and never submits a
-build to a store.
+build to a store. The production dependency audit runs as a separate advisory
+CI job while one upstream finding remains (see `docs/UPGRADE-PLAN.md`).
 
 Run `npm run release:check` for the fail-closed validation plus production
 dependency audit. See [TEST-EVIDENCE.md](./TEST-EVIDENCE.md) for the latest
