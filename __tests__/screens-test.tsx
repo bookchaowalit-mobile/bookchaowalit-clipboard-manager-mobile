@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import * as Clipboard from "expo-clipboard";
+import { Share } from "react-native";
 
 import HomeScreen from "../app/(tabs)/index";
 import ExploreScreen from "../app/(tabs)/explore";
@@ -122,5 +123,61 @@ describe("portfolio screens", () => {
     expect(screen.getByText("Chaowalit Greepoke")).toBeTruthy();
     expect(screen.getByText("bookchaowalit.com")).toBeTruthy();
     expect(screen.getByText("github.com/bookchaowalit")).toBeTruthy();
+  });
+});
+
+describe("archive safety and export", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAsyncStorage.setItem.mockResolvedValue(undefined);
+    mockClipboard.getStringAsync.mockResolvedValue("");
+  });
+
+  test("filing a duplicate moves it up instead of adding a copy", async () => {
+    mockAsyncStorage.getItem.mockResolvedValue(
+      JSON.stringify([
+        { id: "a", text: "older line", createdAt: 1_700_000_000_000, pinned: false },
+        { id: "b", text: "newer line", createdAt: 1_700_000_100_000, pinned: false },
+      ]),
+    );
+    const screen = render(<HomeScreen />);
+    await waitFor(() => expect(screen.getByText("older line")).toBeTruthy());
+
+    fireEvent.changeText(screen.getByLabelText("New snippet"), "older line");
+    fireEvent.press(screen.getByText("File snippet"));
+
+    expect(screen.getByText("MOVED UP / ALREADY FILED")).toBeTruthy();
+    expect(screen.getAllByText("older line")).toHaveLength(1);
+    await waitFor(() => {
+      const saved = JSON.parse(mockAsyncStorage.setItem.mock.calls.at(-1)[1]);
+      expect(saved.map((s: { id: string }) => s.id)).toEqual(["a", "b"]);
+    });
+  });
+
+  test("a failed read never overwrites the stored archive", async () => {
+    mockAsyncStorage.getItem.mockRejectedValue(new Error("storage offline"));
+    const screen = render(<HomeScreen />);
+    await waitFor(() => expect(screen.getByText("ARCHIVE UNAVAILABLE / RETRY LATER")).toBeTruthy());
+
+    fireEvent.changeText(screen.getByLabelText("New snippet"), "session only");
+    fireEvent.press(screen.getByText("File snippet"));
+    expect(screen.getByText("session only")).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(mockAsyncStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  test("exports the archive as a JSON backup through the share sheet", async () => {
+    const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" });
+    mockAsyncStorage.getItem.mockResolvedValue(
+      JSON.stringify([{ id: "a", text: "keep me", createdAt: 1_700_000_000_000, pinned: true }]),
+    );
+    const screen = render(<HomeScreen />);
+    await waitFor(() => expect(screen.getByText("keep me")).toBeTruthy());
+
+    fireEvent.press(screen.getByText("Export archive (JSON)"));
+    await waitFor(() => expect(screen.getByText("EXPORTED / JSON BACKUP SHARED")).toBeTruthy());
+    const payload = JSON.parse(share.mock.calls[0][0].message as string);
+    expect(payload).toMatchObject({ app: "clipboard-manager", version: 1 });
+    expect(payload.snippets[0].text).toBe("keep me");
   });
 });

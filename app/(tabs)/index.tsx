@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -15,6 +16,7 @@ import {
   MAX_SNIPPET_LENGTH,
   STORAGE_KEY,
   addSnippet,
+  exportArchive,
   filterSnippets,
   parseStoredSnippets,
   type Snippet,
@@ -65,6 +67,9 @@ export default function HomeScreen() {
   const [status, setStatus] = useState("ARCHIVE READY / LOCAL ONLY");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  // Only write back after a successful read: saving after a failed read would
+  // overwrite the stored archive with an empty list.
+  const [canSave, setCanSave] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -76,6 +81,7 @@ export default function HomeScreen() {
           return;
         }
         setItems(parseStoredSnippets(stored));
+        setCanSave(true);
         setIsHydrated(true);
       })
       .catch(() => {
@@ -92,14 +98,20 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!canSave) {
       return;
     }
 
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items)).catch(() => {
       setStatus("SAVE FAILED / TRY AGAIN");
     });
-  }, [isHydrated, items]);
+  }, [canSave, items]);
+
+  const exportItems = () => {
+    Share.share({ title: "Clipboard archive", message: exportArchive(items, new Date()) })
+      .then(() => setStatus("EXPORTED / JSON BACKUP SHARED"))
+      .catch(() => setStatus("EXPORT FAILED / TRY AGAIN"));
+  };
 
   useEffect(() => {
     return () => {
@@ -262,7 +274,14 @@ export default function HomeScreen() {
           style={styles.search}
           value={query}
         />
+        <ActionButton
+          label="Export archive (JSON)"
+          variant="quiet"
+          disabled={items.length === 0}
+          onPress={exportItems}
+        />
         {!isHydrated ? (
+
           <ActivityIndicator
             accessibilityLabel="Loading snippets"
             color="#4A90D9"

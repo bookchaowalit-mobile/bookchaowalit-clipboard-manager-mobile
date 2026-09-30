@@ -100,3 +100,12 @@ export function filterSnippets(items: Snippet[], query: string): Snippet[] {
         right.createdAt - left.createdAt,
     );
 }
+
+/** Portable JSON backup of the archive (AsyncStorage is device-only). */
+export function exportArchive(items: Snippet[], now: Date): string {
+  return JSON.stringify(
+    { app: "clipboard-manager", version: 1, exportedAt: now.toISOString(), snippets: items },
+    null,
+    2,
+  );
+}

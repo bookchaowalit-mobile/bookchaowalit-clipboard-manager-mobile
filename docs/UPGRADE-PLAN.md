@@ -21,10 +21,9 @@
   (production signing identity, owner approval).
 
 ### P1
+- Import a JSON backup validated with `parseStoredSnippets` (merge, keep pins).
 - Optional labels/folders for snippets; show "moved up" feedback visually
   (currently status text only).
-- Export/import archive as JSON (AsyncStorage is device-only).
-- Screen test for the duplicate-moves-to-top path.
 
 ### P2
 - Dark/light palette following `userInterfaceStyle`.
@@ -42,3 +41,13 @@
   reports only `image-size`.
 - CI: audit moved to its own advisory job with the reason documented;
   lint/typecheck/test/export remain blocking.
+
+## Done in this pass (pass 2)
+
+Score: 8/10 (unchanged scale; one data-loss bug fixed) — archive export and stronger screen tests.
+
+- Bug fix (data loss): if the initial AsyncStorage read failed, the save effect still ran and overwrote the stored archive with an empty list. Saving is now enabled only after a successful read (regression test proves the old behaviour failed).
+- Export: "Export archive (JSON)" shares a versioned backup (`exportArchive`) through the core `Share` API. Import remains TODO (P1).
+- Screen tests (jest-expo): duplicate filing moves the snippet up without a copy; failed read never writes; export payload shape. 17 tests total.
+- Advisories: unchanged — only `image-size` (high, metro), `uuid`, `decode-uri-component` remain and have no same-major fix.
+- Verified: typecheck, lint, jest (17), Android `expo export` bundle.
