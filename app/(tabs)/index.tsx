@@ -5,60 +5,22 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 
-type Snippet = {
-  id: string;
-  text: string;
-  createdAt: number;
-  pinned: boolean;
-};
-
-const STORAGE_KEY = "clipboard-manager.snippets.v1";
-const MAX_SNIPPET_LENGTH = 5_000;
-
-function isSnippet(value: unknown): value is Snippet {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Partial<Snippet>;
-  return (
-    typeof candidate.id === "string" &&
-    typeof candidate.text === "string" &&
-    candidate.text.length <= MAX_SNIPPET_LENGTH &&
-    typeof candidate.createdAt === "number" &&
-    Number.isFinite(candidate.createdAt) &&
-    typeof candidate.pinned === "boolean"
-  );
-}
-
-function parseStoredSnippets(value: string | null): Snippet[] {
-  if (!value) {
-    return [];
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed)
-      ? parsed.filter(isSnippet).slice(0, 100)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function createSnippetId() {
-  return (
-    Date.now().toString(36) +
-    "-" +
-    Math.random().toString(36).slice(2, 8)
-  );
-}
+import {
+  MAX_SNIPPET_LENGTH,
+  STORAGE_KEY,
+  addSnippet,
+  exportArchive,
+  filterSnippets,
+  readStoredSnippets,
+  type Snippet,
+} from "../../lib/snippets";
 
 function ActionButton({
   label,
@@ -105,6 +67,9 @@ export default function HomeScreen() {
   const [status, setStatus] = useState("ARCHIVE READY / LOCAL ONLY");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  // Only write back after a successful read: saving after a failed read would
+  // overwrite the stored archive with an empty list.
+  const [canSave, setCanSave] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -115,7 +80,14 @@ export default function HomeScreen() {
         if (!active) {
           return;
         }
-        setItems(parseStoredSnippets(stored));
+        const read = readStoredSnippets(stored);
+        setItems(read.items);
+        if (read.intact) {
+          setCanSave(true);
+        } else {
+          // Keep the damaged archive on disk untouched; export still works.
+          setStatus("ARCHIVE DAMAGED / NOT OVERWRITTEN");
+        }
         setIsHydrated(true);
       })
       .catch(() => {
@@ -132,14 +104,20 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!canSave) {
       return;
     }
 
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items)).catch(() => {
       setStatus("SAVE FAILED / TRY AGAIN");
     });
-  }, [isHydrated, items]);
+  }, [canSave, items]);
+
+  const exportItems = () => {
+    Share.share({ title: "Clipboard archive", message: exportArchive(items, new Date()) })
+      .then(() => setStatus("EXPORTED / JSON BACKUP SHARED"))
+      .catch(() => setStatus("EXPORT FAILED / TRY AGAIN"));
+  };
 
   useEffect(() => {
     return () => {
@@ -149,35 +127,25 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    return [...items]
-      .filter((item) => item.text.toLocaleLowerCase().includes(normalizedQuery))
-      .sort(
-        (left, right) =>
-          Number(right.pinned) - Number(left.pinned) ||
-          right.createdAt - left.createdAt,
-      );
-  }, [items, query]);
+  const filteredItems = useMemo(
+    () => filterSnippets(items, query),
+    [items, query],
+  );
 
   const pinnedCount = items.filter((item) => item.pinned).length;
 
   const saveSnippet = () => {
-    const text = draft.trim();
-    if (!text) {
+    const result = addSnippet(items, draft);
+    if (result.items === items) {
       setStatus("HOLD / WRITE A SNIPPET FIRST");
       return;
     }
 
-    const snippet: Snippet = {
-      id: createSnippetId(),
-      text,
-      createdAt: Date.now(),
-      pinned: false,
-    };
-    setItems((current) => [snippet, ...current].slice(0, 100));
+    setItems(result.items);
     setDraft("");
-    setStatus("FILED / SNIPPET IN ARCHIVE");
+    setStatus(
+      result.added ? "FILED / SNIPPET IN ARCHIVE" : "MOVED UP / ALREADY FILED",
+    );
   };
 
   const readClipboard = async () => {
@@ -237,7 +205,7 @@ export default function HomeScreen() {
           {status}
         </Text>
         <View
-          accessibilityLabel={items.length + " files, " + pinnedCount + " pinned"}
+          accessibilityLabel={`${items.length} ${items.length === 1 ? "file" : "files"}, ${pinnedCount} pinned`}
           style={styles.stats}
         >
           <Text style={styles.statValue}>{String(items.length).padStart(2, "0")}</Text>
@@ -312,7 +280,14 @@ export default function HomeScreen() {
           style={styles.search}
           value={query}
         />
+        <ActionButton
+          label="Export archive (JSON)"
+          variant="quiet"
+          disabled={items.length === 0}
+          onPress={exportItems}
+        />
         {!isHydrated ? (
+
           <ActivityIndicator
             accessibilityLabel="Loading snippets"
             color="#4A90D9"

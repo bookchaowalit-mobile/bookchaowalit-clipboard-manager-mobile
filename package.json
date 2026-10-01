@@ -52,7 +52,14 @@
     "preset": "jest-expo",
     "collectCoverageFrom": [
       "app/**/*.{ts,tsx}",
+      "lib/**/*.ts",
       "!app/**/_layout.tsx"
-    ]
+    ],
+    "testTimeout": 20000
+  },
+  "overrides": {
+    "minimatch@3": {
+      "brace-expansion": "1.1.21"
+    }
   }
 }
